@@ -5,6 +5,7 @@ use tokio::net::TcpListener;
 use std::net::SocketAddr;
 use futures_util::stream::StreamExt;
 use futures_util::sink::SinkExt;
+use supports_hyperlinks::TerminalHyperlinks;
 
 pub async fn perform_oauth_flow() -> Result<(), Box<dyn std::error::Error>> {
     // Setup OAuth client
@@ -25,9 +26,15 @@ pub async fn perform_oauth_flow() -> Result<(), Box<dyn std::error::Error>> {
     // Generate the OAuth authorization URL
     let (auth_url, _) = client.authorize_url(|| "state").url();
 
-    // Print the URL and instruct the user to visit it
-    println!("Please open the following URL in your browser to authenticate:\n{}", auth_url);
-    println!("If the URL is not clickable, copy and paste it into your browser.");
+    // Check if the terminal supports hyperlinks
+    if TerminalHyperlinks::is_supported() {
+        // Print the clickable hyperlink if supported
+        println!("\x1b]8;;{}\x1b\\Click here to authenticate with Todoist\x1b]8;;\x1b\\", auth_url);
+    } else {
+        // Fall back to printing the plain URL
+        println!("Please open the following URL in your browser to authenticate:\n{}", auth_url);
+        println!("If the URL is not clickable, copy and paste it into your browser.");
+    }
 
     // Set up a listener to receive the OAuth response
     let addr: SocketAddr = "127.0.0.1:8080".parse()?;
@@ -63,7 +70,7 @@ pub async fn perform_oauth_flow() -> Result<(), Box<dyn std::error::Error>> {
     println!("Authenticated successfully! Your OAuth token is: {}", token.access_token().secret());
 
     // Send a response to the client (browser) confirming success
-    socket.send(Message::Text("Authenticated successfully, you may now close this window.".to_string()))
+    socket.send(Message::Text.into("Authenticated successfully, you may now close this window.".to_string()))
         .await?;
 
     Ok(())
