@@ -218,6 +218,31 @@ async fn get_access_token(code: &str) -> Result<String, String> {
     Ok(access_token_response.access_token)
 }
 
+// Fn that queries the user API with the access token to verify it works
+async fn test_token(access_token: &str) -> Result<(), String> {
+    // Create a reqwest client
+    let client = Client::new();
+
+    // Prepare the URL for the user endpoint
+    let url = "https://api.todoist.com/api/v1/user";
+
+    // Send the GET request with the access token in the Authorization header
+    let response = client
+        .get(url)
+        .header("Authorization", format!("Bearer {}", access_token))
+        .send()
+        .await
+        .map_err(|_| "Failed to send the request".to_string())?;
+
+    // Check if the response is OK
+    if !response.status().is_success() {
+        return Err("Failed to verify access token, server returned an error".to_string());
+    }
+
+    // If we reach here, the access token is valid
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() {
     // Generate a CSRF secret for the OAuth flow
@@ -241,6 +266,15 @@ async fn main() {
             match get_access_token(&code).await {
                 Ok(access_token) => {
                     println!("Received access token: {}", access_token);
+                    // Test the access token by querying the user API
+                    match test_token(&access_token).await {
+                        Ok(_) => {
+                            println!("Access token is valid and works with the API.");
+                        }
+                        Err(error_message) => {
+                            eprintln!("Error testing access token: {}", error_message);
+                        }
+                    }
                 }
                 Err(error_message) => {
                     eprintln!("Error getting access token: {}", error_message);
